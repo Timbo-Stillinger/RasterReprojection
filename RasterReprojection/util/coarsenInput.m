@@ -1,75 +1,57 @@
-function [ newInR, newRaster ] = coarsenInput(raster,InRR,OutRR,planet,method)
+function [ newInR, newRaster ] = coarsenInput(raster,InRR,OutRR,planet)
 %coarsen input raster if resolution of output is significantly coarser
 %Input
 %   raster - original raster
 %   InRR - input raster reference
 %   OutRR - output raster reference
 %   planet - designation of which planet
-%   method - interpolation method
 %Output
 %   newInR - raster reference of newRaster
 %   newRaster - coarsened input raster
 
-thresholdRatio = 1.2;
-[x11,y11,dx,dy,inProj] = cornerCoords(InRR);
-[~,~,odx,ody,outProj] = cornerCoords(OutRR);
-hdy = dy;
-hdx = dx;
-hody = ody;
-hodx = odx;
+thresholdRatio = 3;
+inProj = ~contains(class(InRR),'geographic','IgnoreCase',true);
+outProj = ~contains(class(OutRR),'geographic','IgnoreCase',true);
 
 if xor(inProj,outProj) % one projected, one geographic
     S = referenceEllipsoid(planet);
     R = S.MeanRadius;
-    % convert the geographic one to projected
+    % convert the geographic pixelsize to meters
     if inProj
-        hody = deg2rad(ody)*R;
-        hodx = deg2rad(odx)*R*(cosd(mean(OutRR.LatitudeLimits)));
+        hody = deg2rad(OutRR.CellExtentInLatitude)*R;
+        hodx = deg2rad(OutRR.CellExtentInLongitude)*R*(cosd(mean(OutRR.LatitudeLimits)));
+        hdy = InRR.CellExtentInWorldY;
+        hdx = InRR.CellExtentInWorldX;
     else
-        hdy = deg2rad(dy)*R;
-        hdx = deg2rad(dx)*R*(cosd(mean(InRR.LatitudeLimits)));
+        hdy = deg2rad(InRR.CellExtentInLatitude)*R;
+        hdx = deg2rad(InRR.CellExtentInLongitude)*R*(cosd(mean(InRR.LatitudeLimits)));
+        hody = OutRR.CellExtentInWorldY;
+        hodx = OutRR.CellExtentInWorldX;
+    end
+else
+    % either both geographic or both projected
+    if inProj
+        hody = OutRR.CellExtentInWorldY;
+        hodx = OutRR.CellExtentInWorldX;
+        hdy = InRR.CellExtentInWorldY;
+        hdx = InRR.CellExtentInWorldX;
+    else
+        hody = OutRR.CellExtentInLatitude;
+        hodx = OutRR.CellExtentInLongitude;
+        hdy = InRR.CellExtentInLatitude;
+        hdx = InRR.CellExtentInLongitude;
     end
 end
-minRatio = min(abs([hody hodx]./[hdy hdx]));
-iterations = max(0,floor(log2(minRatio/thresholdRatio))-1);
 
-% reduce by about half every interation
-for k=1:iterations
-    if strcmpi(method,'nearest')
-        if ismatrix(raster)
-            raster = medfilt2(raster,'symmetric');
-        else
-            for s=1:size(raster,3)
-                raster(:,:,s) = medfilt2(raster(:,:,s),'symmetric');
-            end
-        end
-        newRaster = imresize(raster,1/2,method);
-    else
-        newRaster = impyramid(raster,'reduce');
-        % use nearest neighbor to keep NaNs from propagating
-        if any(isnan(newRaster(:)))
-            X = imresize(raster,[size(newRaster,1) size(newRaster,2)],'nearest');
-            t = isnan(newRaster);
-            newRaster(t) = X(t);
-        end
-    end
-    adjustment = size(raster)./size(newRaster);
-    newdy = dy*adjustment(1);
-    newdx = dx*adjustment(2);
-    x11 = x11+(newdx-dx);
-    y11 = y11+(newdy-dy);
-    raster = newRaster;
-    dx = newdx;
-    dy = newdy;
-end
+cellRatio = mean([hodx/hdx hody/hdy]);
 
-% adjust raster reference if we did anything
-if iterations>=1
-    RM = makerefmat(x11,y11,dx,dy);
+%use mapresize or georesize, depending on whether input is projected or
+%geographic
+if cellRatio>thresholdRatio
     if inProj
-        newInR = refmatToMapRasterReference(RM,size(newRaster));
+        [newRaster,newInR] = mapresize(raster,InRR,2/cellRatio);
     else
-        newInR = refmatToGeoRasterReference(RM,size(newRaster));
+        [newRaster,newInR] = georesize(raster,InRR,2/cellRatio);
     end
 else
     newInR = InRR;
