@@ -1,4 +1,6 @@
 function RasterReprojectionMemoryCheck(neededMemory)
+
+persistent already % send the annoying warning to the Mac/Unix folk just once
 if ispc
     [~,sysview] = memory;
     availablePhysicalMemory = sysview.PhysicalMemory.Available;
@@ -13,8 +15,14 @@ if ispc
     end
     
 elseif ismac
-    warning('MemoryCheck function not available on a Mac, your code could blow up if input raster or 3D object is large, good luck')
+    if isempty(already)
+        warning('MemoryCheck function not available on a Mac, your code could blow up if input raster or 3D object is large, good luck')
+        already = true;
+    end
 elseif isunix
-    warning('MemoryCheck function not available on Unix or a Mac, your code could blow up if input raster or 3D object is large, good luck')
+    if isempty(already)
+        warning('MemoryCheck function not available on Unix or a Mac, your code could blow up if input raster or 3D object is large, good luck')
+        already = true;
+    end
 end
 end
