@@ -11,6 +11,7 @@ defaultOrigin = 'ul';
 defaultPlanet = 'earth';
 defaultHemisphere = '';
 defaultMethod = 'linear';
+defaultRotation = 0;
 defaultRR = [];
 defaultCells = true;
 inLat = [];
@@ -49,6 +50,8 @@ addParameter(p,validatestring('longitude',{'lon','lons','longitude'}),...
     [],@(x) isnumeric(x) && ismatrix(x))
 addParameter(p,validatestring('fillvalue',{'fil','fill','fillv','fillvalue'}),...
     [],@(x) isnumeric(x) && isscalar(x))
+addParameter(p,validatestring('rotate',{'rot','rotate','rotation'}),...
+    defaultRotation,@(x) isnumeric(x) && isscalar(x))
 
 
 parse(p,A,InRR,InS,OutS,varargin{:})
@@ -110,12 +113,12 @@ if isempty(p.Results.InRR)
     lonlim = [min(inLon(:)) max(inLon(:))];
 else
     assert(isempty(p.Results.latitude) && isempty(p.Results.longitude),...
-        'if input referencing matrix or raster reference is specified, then input ''latitude'' and ''longitude'' must NOT be specified')
+        'if input raster reference is specified, then input ''latitude'' and ''longitude'' must NOT be specified')
     if isempty(InS) % input is geographic, not projected
         if contains(class(p.Results.InRR),'geographic','IgnoreCase',true)
             InRR = p.Results.InRR;
         elseif contains(class(p.Results.InRR),'mapcells','IgnoreCase',true) ||...
-                contains(class(p.Results.inR),'mappostings','IgnoreCase',true)
+                contains(class(p.Results.inRR),'mappostings','IgnoreCase',true)
             error('if input A is geographic, input raster reference must be Geographic, not MapCells or MapPostings')
         end
         if isnan(latlim)
@@ -193,7 +196,7 @@ if isempty(p.Results.rasterref)
             elseif strcmpi(class(InRR),'map.rasterref.GeographicCellsReference')
                 pixelsize = [InRR.CellExtentInLatitude InRR.CellExtentInLongitude];
             else
-                error('class input raster reference %s not recognized', class(inR))
+                error('class input raster reference %s not recognized', class(inRR))
             end
         elseif ~isempty(InS) && ~isempty(OutS)
             if isequal(class(InRR),'map.rasterref.MapPostingsReference')
@@ -201,7 +204,7 @@ if isempty(p.Results.rasterref)
             elseif isequal(class(InRR),'map.rasterref.MapCellsReference')
                 pixelsize = [InRR.CellExtentInWorldY InRR.CellExtentInWorldX];
             else
-                error('class input raster reference %s not recognized', class(inR))
+                error('class input raster reference %s not recognized', class(inRR))
             end
         elseif xor(isempty(InS),isempty(OutS))
             pixelsize = [(max(YLimit)-min(YLimit))/size(A,1)...
@@ -229,13 +232,13 @@ if isempty(p.Results.rasterref)
         nCols = round((XLimit(2)-XLimit(1))/pixelsize(2));
     end
     
-    % output raster references
+    % geographic or projected
     if isempty(OutS)
         if p.Results.cells
             OutRR = georefcells(YLimit,XLimit,[nRows nCols],...
                 'ColumnsStartFrom',startcol,'RowsStartFrom',startrow);
         else
-            OutRR = georefpostings(YLimit,XLimit,[nRows nCols],...
+            OutRR = georefpostings(XLimit,YLimit,[nRows nCols],...
                 'ColumnsStartFrom',startcol,'RowsStartFrom',startrow);
         end
     else
@@ -247,6 +250,13 @@ if isempty(p.Results.rasterref)
                 'ColumnsStartFrom',startcol,'RowsStartFrom',startrow);
         end
     end
+    
+    % affine transformation in output raster reference?
+    doAffine = p.Results.rotate~=0;
+    if doAffine
+        OutRR = transformToAffine(OutRR,p.Results.rotate);
+    end
+    
 else
     OutRR = p.Results.rasterref;
 end

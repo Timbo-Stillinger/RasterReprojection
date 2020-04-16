@@ -31,9 +31,6 @@ if ismatrix(A)
     else
         B = geointerp(A,RR,Yq,Xq,method);
     end
-    if all(isnan(B(:)))
-        error('all interpolated values are NaN')
-    end
 elseif ndims(A)==3
     for k=1:size(A,3)
         V = A(:,:,k);

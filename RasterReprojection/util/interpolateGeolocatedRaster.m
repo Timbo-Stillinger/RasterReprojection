@@ -18,9 +18,6 @@ CheckInputCoordinates(X,Y,Xq,Yq);
 if ismatrix(A)
     F = scatteredInterpolant(X(:),Y(:),A(:),method,'none');
     B = F(Xq,Yq);
-    if all(isnan(B(:)))
-        error('all interpolated values are NaN')
-    end
 elseif ndims(A)==3
     for k=1:size(A,3)
         V = A(:,:,k);
