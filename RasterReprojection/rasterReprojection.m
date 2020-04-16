@@ -28,7 +28,7 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %           (if input data are logical or categorical, interpolation is 'nearest')
 %       'rasterref' - output raster reference object, mapping or geographic
 %           (this option allows output to exactly match another known
-%           image, for example if fitting a elevation model to a satellite
+%           image, for example if fitting an elevation model to a satellite
 %           image frame)
 %       'latitude' and 'longitude' - needed when input A data are geolocated
 %           (irregularly spaced cells, for example swath satellite data) -
@@ -56,11 +56,13 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %       'cells' - true or false to specifiy whether inputs are cells or
 %           postings (default true, also ignored if InR is a raster
 %           reference)
+%       'rotate' - in degrees, +ccw, if the output projection is rotated so
+%           an affine transformation is needed
 %
 %OUTPUT
 %   B output reprojected raster, same class as input A
 %   RRB raster reference object for B
-%       (if you want a referencing matrix, use the optional output)
+%       (if you want a referencing matrix also, use the optional output)
 %Optional OUTPUT, in order
 %   fillvalue - especially useful if input data are not floating point and
 %       you want to convert them to floating point
@@ -79,23 +81,21 @@ assert (mod(optargin,2)==0,'must be even number of optional arguments')
 % resolution, so that the output is averaged over multiple input pixels
 if ~isempty(InRasterRef) &&...
         contains(InRasterRef.RasterInterpretation,'cells','IgnoreCase',true)
-    [InRasterRef,A] = coarsenInput(A,InRasterRef,OutRasterRef,planet,method);
+    [InRasterRef,A] = coarsenInput(A,InRasterRef,OutRasterRef,planet);
 end
 
 % world coordinates in output image
-if contains(class(OutRasterRef),'Map')
     [XIntrinsic,YIntrinsic] =...
         meshgrid(1:OutRasterRef.RasterSize(2),1:OutRasterRef.RasterSize(1));
+if contains(class(OutRasterRef),'map.rasterref.Map','IgnoreCase',true)
     [XWorld, YWorld] = intrinsicToWorld(OutRasterRef,XIntrinsic,YIntrinsic);
-    try % minvtran fails on some projections, like sinusoidal when projection
-        % structure is incorrect
+    try % minvtran fails on some projections
         [lat,lon] = minvtran(OutProj,XWorld,YWorld);
-    catch % in those cases, use projinv instead, which also fails on some,
-        % like UTM
+    catch % in those cases, use projinv instead, which also fails on some
         [lat,lon] = projinv(OutProj,XWorld,YWorld);
     end
 elseif contains(class(OutRasterRef),'Geographic')
-    [lat,lon] = map.internal.geographicPointMesh(OutRasterRef);
+    [lat,lon] = intrinsicToGeographic(OutRasterRef,XIntrinsic,YIntrinsic);
 else
     error('OutRasterRef class %s unrecognized',class(OutRasterRef))
 end
