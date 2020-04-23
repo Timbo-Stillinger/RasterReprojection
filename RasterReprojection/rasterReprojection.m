@@ -1,12 +1,16 @@
 function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin )
-% [ B, RRB [,fillvalue]] = rasterReprojection(A,InR,InProj,OutProj [,Prop/Value pairs] )
+% [ B, RRB [,fillvalue, RefMatrix]] = rasterReprojection(A,InR,InProj,OutProj [,Prop/Value pairs] )
 %Reprojects raster from a projected, geographic, or geolocated raster (2D or 3D)
 %to a different projection or geographic raster, or to the same projection with
 %a different cell size
-%(there is no option for output geolocated raster)
+%(there is no option for output geolocated raster, but this option could be
+%implemented if it would be useful)
 %
 %INPUT
-%   A - input raster (2D or 3D), any numeric type, or logical
+%   A - input raster (2D or 3D), any numeric type, or logical or categorical
+%       (categorical data are supported by indexing them to integers and
+%       setting the interpolation method to 'nearest', then recasting them
+%       as categorical)
 %   InR - raster reference (geographic or mapping) for A. InR must be empty
 %       if input data are geolocated, in which case lat-lon grids are
 %       specified below.
@@ -27,8 +31,8 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %           'natural'
 %           (if input data are logical or categorical, interpolation is 'nearest')
 %       'rasterref' - output raster reference object, mapping or geographic
-%           (this option allows output to exactly match another known
-%           image, for example if fitting an elevation model to a satellite
+%           (this useful option allows output to exactly match another known
+%           raster, for example if fitting an elevation model to a satellite
 %           image frame)
 %       'latitude' and 'longitude' - needed when input A data are geolocated
 %           (irregularly spaced cells, for example swath satellite data) -
@@ -75,13 +79,19 @@ assert(ismatrix(A) || ndims(A)==3,...
 optargin=length(varargin);
 assert (mod(optargin,2)==0,'must be even number of optional arguments')
 [InRasterRef,OutRasterRef,planet,method,inLat,inLon,fillvalue] =...
-    parseInput(A,InR,InProj,OutProj,varargin{:});
+    parseReprojectionInput(A,InR,InProj,OutProj,varargin{:});
+
+% convert categorical to integer
+if iscategorical(A)
+    [A,method,categories,catIndex,fillvalue] = fwdCategorical(A,method,fillvalue);
+end
 
 % coarsen input image if output is at significantly coarser
 % resolution, so that the output is averaged over multiple input pixels
 if ~isempty(InRasterRef) &&...
+        ~strcmpi(method,'nearest') &&...
         contains(InRasterRef.RasterInterpretation,'cells','IgnoreCase',true)
-    [InRasterRef,A] = coarsenInput(A,InRasterRef,OutRasterRef,planet);
+    [A,InRasterRef] = coarsenInput(A,InRasterRef,OutRasterRef,planet,fillvalue);
 end
 
 % world coordinates in output image
@@ -126,8 +136,6 @@ if isempty(fillvalue) % fill value depending on original type
             fillvalue = intmin(origType);
         case 'logical'
             fillvalue = false;
-        case 'categorical'
-            fillvalue = categorical(0);
         otherwise
             error('class ''%s'' not recognized',origType)
     end
@@ -143,17 +151,15 @@ else % make sure fill value is within range
             if ~islogical(fillvalue)
                 fillvalue = fillvalue==1;
             end
-        case 'categorical'
-            if ~iscategorical(fillvalue)
-                fillvalue = categorical(fillvalue);
-            end
+        case {'double','single'}
+            %do nothing as any value would work
     end
 end
 
 % interpolate to output points specified in terms of input coordinates
 % set input values to double, setting their fillvalues to NaNs
 dblA = double(A);
-if ~(strcmpi(origType,'single') || strcmpi(origType,'double'))
+if ~isnan(fillvalue)
     dblA(A==fillvalue) = NaN;
 end
 if geolocated
@@ -179,23 +185,20 @@ end
 t = isnan(B);
 if contains(origType,'single')
     B = single(B);
-    if ~isnan(fillvalue)
-        B(t) = fillvalue;
-    end
-elseif contains(origType,'double')
-    if ~isnan(fillvalue)
-        B(t) = fillvalue;
-    end
 elseif contains(origType,'logical')
     x = B>=0.5;
     B = x;
-    B(t) = fillvalue;
-elseif contains(origType,'categorical')
-    B = categorical(round(B));
-    B(t) = fillvalue;
-else % just signed or unsigned ints are the possibilities
+elseif ~contains(origType,'double')
+    % just signed or unsigned ints are the possibilities
     B = cast(round(B),origType);
+end
+if ~isnan(fillvalue)
     B(t) = fillvalue;
+end
+
+% if original input was categorical, transform back from signed int
+if exist('categories','var')
+    B = invCategorical(B,categories,catIndex);
 end
 
 % set the optional output fillvalue and referencing matrix
