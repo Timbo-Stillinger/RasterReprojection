@@ -21,16 +21,19 @@ if ismatrix(A)
 elseif ndims(A)==3
     for k=1:size(A,3)
         V = A(:,:,k);
-        F = scatteredInterpolant(X(:),Y(:),V(:),method,'none');
-        B1 = F(Xq,Yq);
         % allocate on first pass
         if k==1
+            F = scatteredInterpolant(X(:),Y(:),V(:),method,'none');
+            B1 = F(Xq,Yq);
             %memory check
             if ispc
                 RasterReprojectionMemoryCheck(8*size(A,3)*(numel(B1)));
             end
             %allocate output space
             B = zeros(size(B1,1),size(B1,2),size(A,3));
+        else
+            F.Values = V(:);
+            B1 = F(Xq,Yq);
         end
         B(:,:,k) = B1;
     end
