@@ -1,4 +1,4 @@
-function [ newInR, newRaster ] = coarsenInput(raster,InRR,OutRR,planet)
+function [ newRaster, newInRR ] = coarsenInput(raster,InRR,OutRR,planet,fillvalue)
 %coarsen input raster if resolution of output is significantly coarser
 %Input
 %   raster - original raster
@@ -48,13 +48,49 @@ cellRatio = mean([hodx/hdx hody/hdy]);
 %use mapresize or georesize, depending on whether input is projected or
 %geographic
 if cellRatio>thresholdRatio
-    if inProj
-        [newRaster,newInR] = mapresize(raster,InRR,2/cellRatio);
+    if iscategorical(raster)
+        method = 'nearest';
     else
-        [newRaster,newInR] = georesize(raster,InRR,2/cellRatio);
+        method = 'cubic';
+    end
+    A = double(raster);
+    if ~isfloat(raster)
+        A(raster==fillvalue) = NaN;
+    end
+    if inProj
+        [newRaster,newInRR] = mapresize(A,InRR,2/cellRatio,method);
+        if ~strcmpi(method,'nearest') && any(isnan(newRaster),'all')
+            % use nearest neighbor to keep NaNs from propagating
+            t = isnan(newRaster);
+            [holdRaster,~] = mapresize(A,InRR,2/cellRatio,'nearest');
+            newRaster(t) = holdRaster(t);
+        end
+    else
+        [newRaster,newInRR] = georesize(A,InRR,2/cellRatio);
+        if ~strcmpi(method,'nearest') && any(isnan(newRaster),'all')
+            % use nearest neighbor to keep NaNs from propagating
+            t = isnan(newRaster);
+            [holdRaster,~] = georesize(A,InRR,2/cellRatio,'nearest');
+            newRaster(t) = holdRaster(t);
+        end
+    end
+    t = isnan(newRaster);
+    if isa(raster,'single')
+        newRaster = single(newRaster);
+        if ~isnan(fillvalue)
+            newRaster(t) = fillvalue;
+        end
+    elseif ~isa(raster,'double') && ~islogical(raster)
+        newRaster = cast(round(newRaster),class(raster));
+        newRaster(t) = fillvalue;
+    elseif logical(raster)
+        newRaster = newRaster>0.5;
+        newRaster(t) = fillvalue;
+    elseif ~isnan(fillvalue) % double is the only class left
+        newRaster(t) = fillvalue;
     end
 else
-    newInR = InRR;
+    newInRR = InRR;
     newRaster = raster;
 end
 end
