@@ -11,6 +11,8 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %       (categorical data are supported by indexing them to integers and
 %       setting the interpolation method to 'nearest', then recasting them
 %       as categorical)
+%       (logical data are cast as 0 or 1, interpolated by whatever method
+%       is specified, then converted back to logical true for values > 0.5)
 %   InR - raster reference (geographic or mapping) for A. InR must be empty
 %       if input data are geolocated, in which case lat-lon grids are
 %       specified below.
@@ -29,7 +31,7 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %           (fastest), 'cubic', 'spline', or 'makima'; options when input
 %           data are geolocated are 'linear' (default), 'nearest', or
 %           'natural'
-%           (if input data are logical or categorical, interpolation is 'nearest')
+%           (if input data are categorical, interpolation is 'nearest')
 %       'rasterref' - output raster reference object, mapping or geographic
 %           (this useful option allows output to exactly match another known
 %           raster, for example if fitting an elevation model to a satellite
