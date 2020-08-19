@@ -1,0 +1,366 @@
+
+<!DOCTYPE html
+  PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html><head>
+      <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+   <!--
+This HTML was auto-generated from MATLAB code.
+To make changes, update the MATLAB code and republish this document.
+      --><title>rasterReprojection</title><meta name="generator" content="MATLAB 9.8"><link rel="schema.DC" href="http://purl.org/dc/elements/1.1/"><meta name="DC.date" content="2020-08-18"><meta name="DC.source" content="rasterReprojection.m"><style type="text/css">
+html,body,div,span,applet,object,iframe,h1,h2,h3,h4,h5,h6,p,blockquote,pre,a,abbr,acronym,address,big,cite,code,del,dfn,em,font,img,ins,kbd,q,s,samp,small,strike,strong,sub,sup,tt,var,b,u,i,center,dl,dt,dd,ol,ul,li,fieldset,form,label,legend,table,caption,tbody,tfoot,thead,tr,th,td{margin:0;padding:0;border:0;outline:0;font-size:100%;vertical-align:baseline;background:transparent}body{line-height:1}ol,ul{list-style:none}blockquote,q{quotes:none}blockquote:before,blockquote:after,q:before,q:after{content:'';content:none}:focus{outine:0}ins{text-decoration:none}del{text-decoration:line-through}table{border-collapse:collapse;border-spacing:0}
+
+html { min-height:100%; margin-bottom:1px; }
+html body { height:100%; margin:0px; font-family:Arial, Helvetica, sans-serif; font-size:10px; color:#000; line-height:140%; background:#fff none; overflow-y:scroll; }
+html body td { vertical-align:top; text-align:left; }
+
+h1 { padding:0px; margin:0px 0px 25px; font-family:Arial, Helvetica, sans-serif; font-size:1.5em; color:#d55000; line-height:100%; font-weight:normal; }
+h2 { padding:0px; margin:0px 0px 8px; font-family:Arial, Helvetica, sans-serif; font-size:1.2em; color:#000; font-weight:bold; line-height:140%; border-bottom:1px solid #d6d4d4; display:block; }
+h3 { padding:0px; margin:0px 0px 5px; font-family:Arial, Helvetica, sans-serif; font-size:1.1em; color:#000; font-weight:bold; line-height:140%; }
+
+a { color:#005fce; text-decoration:none; }
+a:hover { color:#005fce; text-decoration:underline; }
+a:visited { color:#004aa0; text-decoration:none; }
+
+p { padding:0px; margin:0px 0px 20px; }
+img { padding:0px; margin:0px 0px 20px; border:none; }
+p img, pre img, tt img, li img, h1 img, h2 img { margin-bottom:0px; }
+
+ul { padding:0px; margin:0px 0px 20px 23px; list-style:square; }
+ul li { padding:0px; margin:0px 0px 7px 0px; }
+ul li ul { padding:5px 0px 0px; margin:0px 0px 7px 23px; }
+ul li ol li { list-style:decimal; }
+ol { padding:0px; margin:0px 0px 20px 0px; list-style:decimal; }
+ol li { padding:0px; margin:0px 0px 7px 23px; list-style-type:decimal; }
+ol li ol { padding:5px 0px 0px; margin:0px 0px 7px 0px; }
+ol li ol li { list-style-type:lower-alpha; }
+ol li ul { padding-top:7px; }
+ol li ul li { list-style:square; }
+
+.content { font-size:1.2em; line-height:140%; padding: 20px; }
+
+pre, code { font-size:12px; }
+tt { font-size: 1.2em; }
+pre { margin:0px 0px 20px; }
+pre.codeinput { padding:10px; border:1px solid #d3d3d3; background:#f7f7f7; }
+pre.codeoutput { padding:10px 11px; margin:0px 0px 20px; color:#4c4c4c; }
+pre.error { color:red; }
+
+@media print { pre.codeinput, pre.codeoutput { word-wrap:break-word; width:100%; } }
+
+span.keyword { color:#0000FF }
+span.comment { color:#228B22 }
+span.string { color:#A020F0 }
+span.untermstring { color:#B20000 }
+span.syscmd { color:#B28C00 }
+span.typesection { color:#A0522D }
+
+.footer { width:auto; padding:10px 0px; margin:25px 0px 0px; border-top:1px dotted #878787; font-size:0.8em; line-height:140%; font-style:italic; color:#878787; text-align:left; float:none; }
+.footer p { margin:0px; }
+.footer a { color:#878787; }
+.footer a:hover { color:#878787; text-decoration:underline; }
+.footer a:visited { color:#878787; }
+
+table th { padding:7px 5px; text-align:left; vertical-align:middle; border: 1px solid #d6d4d4; font-weight:bold; }
+table td { padding:7px 5px; text-align:left; vertical-align:top; border:1px solid #d6d4d4; }
+
+
+
+
+
+  </style></head><body><div class="content"><h2>Contents</h2><div><ul><li><a href="#4">INPUT</a></li><li><a href="#5">OPTIONAL INPUT</a></li><li><a href="#6">OUTPUT</a></li></ul></div><pre class="codeinput"><span class="keyword">function</span> [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin )
+</pre><pre class="codeinput"><span class="comment">% [ B, RRB [,fillvalue, RefMatrix]] = rasterReprojection(A,InR,InProj,OutProj [,Prop/Value pairs] )</span>
+</pre><p>Reprojects raster from a projected, geographic, or geolocated raster (2D or 3D) to a different projection or geographic raster, or to the same projection with a different cell size (there is no option for output geolocated raster, but this option could be implemented if it would be useful)</p><h2 id="4">INPUT</h2><pre class="language-matlab">A - input raster (2D or 3D), any <span class="string">numeric</span> <span class="string">type</span>, or <span class="string">logical</span> <span class="string">or</span> <span class="string">categorical</span>
+    (categorical data are supported by indexing them to integers and
+    setting <span class="string">the</span> <span class="string">interpolation</span> <span class="string">method</span> <span class="string">to</span> <span class="string">'nearest'</span>, then <span class="string">recasting</span> <span class="string">them</span>
+    as <span class="string">categorical)</span>
+    (logical data are cast as 0 or 1, interpolated by whatever method
+    is <span class="string">specified</span>, then <span class="string">converted</span> <span class="string">back</span> <span class="string">to</span> <span class="string">logical</span> <span class="string">true</span> <span class="string">for</span> <span class="string">values</span> <span class="string">&gt;</span> <span class="string">0.5)</span>
+InR - raster reference (geographic or mapping) <span class="keyword">for</span> A. InR must <span class="string">be</span> <span class="string">empty</span>
+    <span class="keyword">if</span> input data <span class="string">are</span> <span class="string">geolocated</span>, in <span class="string">which</span> <span class="string">case</span> <span class="string">lat-lon</span> <span class="string">grids</span> <span class="string">are</span>
+    specified <span class="string">below.</span>
+    (generally raster interpretation should be <span class="string">'cells'</span>, not <span class="string">'postings'</span>,
+    so <span class="string">a</span> <span class="string">warning</span> <span class="string">is</span> <span class="string">issued</span> <span class="string">if</span> <span class="string">InR</span> <span class="string">specifies</span> <span class="string">'postings'</span> <span class="string">unless</span> <span class="string">'cells'</span>
+    below <span class="string">is</span> <span class="string">false)</span>
+InProj - input projection <span class="string">structure</span>, [] <span class="keyword">if</span> geographic or <span class="string">geolocated</span>
+OutProj - output projection <span class="string">structure</span>, [] <span class="keyword">if</span> geographic
+</pre><h2 id="5">OPTIONAL INPUT</h2><pre class="language-matlab">name-value pairs, <span class="keyword">case</span>-insensitive, abbreviations <span class="string">of</span> <span class="string">3</span> <span class="string">or</span> <span class="string">more</span> <span class="string">letters</span>
+    generally <span class="string">work</span>, in <span class="string">any</span> <span class="string">order</span> <span class="string">specifying:</span>
+    <span class="string">'planet'</span> - planet name <span class="string">as</span> <span class="string">a</span> <span class="string">character</span> <span class="string">string</span>, <span class="keyword">case</span> insensitive,
+        defaults <span class="string">to</span> <span class="string">'earth'</span>
+    <span class="string">'hemisphere'</span> - specify <span class="keyword">if</span> input image <span class="string">is</span> <span class="string">entire</span> <span class="string">northern</span> <span class="string">or</span> <span class="string">southern</span>
+        hemisphere <span class="string">or</span> <span class="string">whole</span> <span class="string">planet</span>, choices <span class="string">are</span> <span class="string">'north'</span>, <span class="string">'south'</span>, or
+        <span class="string">'both'</span> or <span class="string">'whole'</span>
+    <span class="string">'method'</span> - interpolation method, options <span class="string">when</span> <span class="string">input</span> <span class="string">data</span> <span class="string">are</span> <span class="string">gridded</span>
+        (i.e. when InR is specified) are <span class="string">'linear'</span> <span class="string">(default)</span>, <span class="string">'nearest'</span>
+        (fastest), <span class="string">'cubic'</span>, <span class="string">'spline'</span>, or <span class="string">'makima'</span>; options <span class="string">when</span> <span class="string">input</span>
+        data <span class="string">are</span> <span class="string">geolocated</span> <span class="string">are</span> <span class="string">'linear'</span> <span class="string">(default)</span>, <span class="string">'nearest'</span>, or
+        <span class="string">'natural'</span>
+        (<span class="keyword">if</span> input data <span class="string">are</span> <span class="string">categorical</span>, interpolation <span class="string">is</span> <span class="string">'nearest')</span>
+    <span class="string">'rasterref'</span> - output raster <span class="string">reference</span> <span class="string">object</span>, mapping <span class="string">or</span> <span class="string">geographic</span>
+        (this useful option allows output to exactly match another known
+        raster, <span class="keyword">for</span> example <span class="keyword">if</span> fitting an <span class="string">elevation</span> <span class="string">model</span> <span class="string">to</span> <span class="string">a</span> <span class="string">satellite</span>
+        image <span class="string">frame)</span>
+    <span class="string">'latitude'</span> and <span class="string">'longitude'</span> <span class="string">-</span> <span class="string">needed</span> <span class="string">when</span> <span class="string">input</span> <span class="string">A</span> <span class="string">data</span> <span class="string">are</span> <span class="string">geolocated</span>
+        (irregularly spaced cells, <span class="keyword">for</span> example swath <span class="string">satellite</span> <span class="string">data) -</span>
+        matrices <span class="string">of</span> <span class="string">latitude</span> <span class="string">and</span> <span class="string">longitude</span>, same <span class="string">size</span> <span class="string">as</span> <span class="string">first</span> <span class="string">2</span>
+        dimensions <span class="string">of</span> <span class="string">A</span>
+        (<span class="keyword">if</span> input irregularly <span class="string">spaced</span> <span class="string">data</span> <span class="string">are</span> <span class="string">in</span> <span class="string">projected</span> <span class="string">coordinates</span>,
+        convert <span class="string">to</span> <span class="string">lat-lon)</span>
+    <span class="string">'fillvalue'</span> - output value <span class="string">for</span> <span class="string">the</span> <span class="string">cells</span> <span class="string">that</span> <span class="string">do</span> <span class="string">not</span> <span class="string">fall</span> <span class="string">within</span>
+        the <span class="string">projection</span> <span class="string">boundaries</span>, or <span class="string">that</span> <span class="string">are</span> <span class="string">of</span> <span class="string">unknown</span> <span class="string">value</span> <span class="string">in</span> <span class="string">the</span>
+        input <span class="string">raster</span> <span class="string">(defaults are NaN for floating point, minimum for</span>
+        signed <span class="string">integers</span>, maximum <span class="string">for</span> <span class="string">unsigned</span> <span class="string">integers</span>, or <span class="string">you</span> <span class="string">can</span>
+        specify <span class="string">a</span> <span class="string">value)</span>
+</pre><pre>     The following arguments are ignored if 'rasterref' option is used,
+     except 'cells' should be set to false if the input 'rasterref' sets
+     'postings' as the raster interpretation, otherwise a warning is
+     triggered
+     'cells' - true or false to specify whether inputs are cells or
+         postings (default true, checks and warns if InR or 'rasterref'
+         specifies 'postings' as the raster interpretation)
+     'pixelsize' - either a 2-element vector specifying height and width
+         of output cells, or a scalar if height=width (default is to
+         approximately match the cell size of input raster)
+     'XLimit' and 'YLimit' - each vectors of length 2: minimum &amp; maximum
+         of output x- and y-coordinates (default is to cover extent of A)
+     'Origin' - 'ul' (upper left, default unless 'rasterref' specified),
+         other options are 'll', 'ur', or 'lr'
+     'adjust' - true or false to adjust x- and y-limits to be a multiple
+         of the pixelsize (default true unless 'rasterref' specified, in
+         which case default is false)
+     'rotate' - in degrees, +ccw, if the output projection is rotated so
+         an affine transformation is needed</pre><h2 id="6">OUTPUT</h2><pre class="language-matlab">B - output reprojected <span class="string">raster</span>, same <span class="string">class</span> <span class="string">as</span> <span class="string">input</span> <span class="string">A</span>
+RRB - raster reference <span class="string">object</span> <span class="string">for</span> <span class="string">B</span>
+    (<span class="keyword">if</span> you want <span class="string">a</span> <span class="string">referencing</span> <span class="string">matrix</span> <span class="string">also</span>, use <span class="string">the</span> <span class="string">optional</span> <span class="string">output)</span>
+Optional <span class="string">OUTPUT</span>, in <span class="string">order</span>
+fillvalue - especially useful <span class="string">if</span> <span class="string">input</span> <span class="string">data</span> <span class="string">are</span> <span class="string">not</span> <span class="string">floating</span> <span class="string">point</span> <span class="string">and</span>
+    you <span class="string">want</span> <span class="string">to</span> <span class="string">convert</span> <span class="string">them</span> <span class="string">to</span> <span class="string">floating</span> <span class="string">point</span>
+RefMatrix - referencing matrix
+</pre><pre class="codeinput">&nbsp;</pre><pre class="codeinput"><span class="keyword"></span>
+</pre><p class="footer"><br><a href="https://www.mathworks.com/products/matlab/">Published with MATLAB&reg; R2020a</a><br></p></div><!--
+##### SOURCE BEGIN #####
+function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin )
+% [ B, RRB [,fillvalue, RefMatrix]] = rasterReprojection(A,InR,InProj,OutProj [,Prop/Value pairs] )
+%%
+% Reprojects raster from a projected, geographic, or geolocated raster (2D or 3D)
+% to a different projection or geographic raster, or to the same projection
+% with a different cell size
+% (there is no option for output geolocated raster, but this option could be
+% implemented if it would be useful)
+%
+%% INPUT
+%   A - input raster (2D or 3D), any numeric type, or logical or categorical
+%       (categorical data are supported by indexing them to integers and
+%       setting the interpolation method to 'nearest', then recasting them
+%       as categorical)
+%       (logical data are cast as 0 or 1, interpolated by whatever method
+%       is specified, then converted back to logical true for values > 0.5)
+%   InR - raster reference (geographic or mapping) for A. InR must be empty
+%       if input data are geolocated, in which case lat-lon grids are
+%       specified below.
+%       (generally raster interpretation should be 'cells', not 'postings',
+%       so a warning is issued if InR specifies 'postings' unless 'cells'
+%       below is false)
+%   InProj - input projection structure, [] if geographic or geolocated
+%   OutProj - output projection structure, [] if geographic
+%% OPTIONAL INPUT
+%   name-value pairs, case-insensitive, abbreviations of 3 or more letters
+%       generally work, in any order specifying:
+%       'planet' - planet name as a character string, case insensitive,
+%           defaults to 'earth'
+%       'hemisphere' - specify if input image is entire northern or southern
+%           hemisphere or whole planet, choices are 'north', 'south', or
+%           'both' or 'whole'
+%       'method' - interpolation method, options when input data are gridded
+%           (i.e. when InR is specified) are 'linear' (default), 'nearest'
+%           (fastest), 'cubic', 'spline', or 'makima'; options when input
+%           data are geolocated are 'linear' (default), 'nearest', or
+%           'natural'
+%           (if input data are categorical, interpolation is 'nearest')
+%       'rasterref' - output raster reference object, mapping or geographic
+%           (this useful option allows output to exactly match another known
+%           raster, for example if fitting an elevation model to a satellite
+%           image frame)
+%       'latitude' and 'longitude' - needed when input A data are geolocated
+%           (irregularly spaced cells, for example swath satellite data) -
+%           matrices of latitude and longitude, same size as first 2
+%           dimensions of A
+%           (if input irregularly spaced data are in projected coordinates,
+%           convert to lat-lon)
+%       'fillvalue' - output value for the cells that do not fall within
+%           the projection boundaries, or that are of unknown value in the
+%           input raster (defaults are NaN for floating point, minimum for
+%           signed integers, maximum for unsigned integers, or you can
+%           specify a value)
+%
+%       The following arguments are ignored if 'rasterref' option is used,
+%       except 'cells' should be set to false if the input 'rasterref' sets
+%       'postings' as the raster interpretation, otherwise a warning is
+%       triggered
+%       'cells' - true or false to specify whether inputs are cells or
+%           postings (default true, checks and warns if InR or 'rasterref'
+%           specifies 'postings' as the raster interpretation)
+%       'pixelsize' - either a 2-element vector specifying height and width
+%           of output cells, or a scalar if height=width (default is to
+%           approximately match the cell size of input raster)
+%       'XLimit' and 'YLimit' - each vectors of length 2: minimum & maximum
+%           of output x- and y-coordinates (default is to cover extent of A)
+%       'Origin' - 'ul' (upper left, default unless 'rasterref' specified),
+%           other options are 'll', 'ur', or 'lr'
+%       'adjust' - true or false to adjust x- and y-limits to be a multiple
+%           of the pixelsize (default true unless 'rasterref' specified, in
+%           which case default is false)
+%       'rotate' - in degrees, +ccw, if the output projection is rotated so
+%           an affine transformation is needed
+%
+%% OUTPUT
+%   B - output reprojected raster, same class as input A
+%   RRB - raster reference object for B
+%       (if you want a referencing matrix also, use the optional output)
+% Optional OUTPUT, in order
+%   fillvalue - especially useful if input data are not floating point and
+%       you want to convert them to floating point
+%   RefMatrix - referencing matrix
+
+%%
+
+% parse inputs
+assert(ismatrix(A) || ndims(A)==3,...
+    'input array must have 2 or 3 dimensions')
+optargin=length(varargin);
+assert (mod(optargin,2)==0,'must be even number of optional arguments')
+[InRasterRef,OutRasterRef,planet,method,inLat,inLon,fillvalue] =...
+    parseReprojectionInput(A,InR,InProj,OutProj,varargin{:});
+
+% convert categorical to integer
+if iscategorical(A)
+    [A,method,categories,catIndex,fillvalue] = fwdCategorical(A,method,fillvalue);
+end
+
+% coarsen input image if output is at significantly coarser
+% resolution, so that the output is averaged over multiple input pixels
+if ~isempty(InRasterRef) && ~strcmpi(method,'nearest')
+    [A,InRasterRef] = coarsenInput(A,InRasterRef,OutRasterRef,planet,fillvalue);
+end
+
+% world coordinates in output image
+[XIntrinsic,YIntrinsic] =...
+    meshgrid(1:OutRasterRef.RasterSize(2),1:OutRasterRef.RasterSize(1));
+if contains(class(OutRasterRef),'map.rasterref.Map','IgnoreCase',true)
+    [XWorld, YWorld] = intrinsicToWorld(OutRasterRef,XIntrinsic,YIntrinsic);
+    try % minvtran fails on some projections
+        [lat,lon] = minvtran(OutProj,XWorld,YWorld);
+    catch % in those cases, use projinv instead, which also fails on some
+        [lat,lon] = projinv(OutProj,XWorld,YWorld);
+    end
+elseif contains(class(OutRasterRef),'Geographic')
+    [lat,lon] = intrinsicToGeographic(OutRasterRef,XIntrinsic,YIntrinsic);
+else
+    error('OutRasterRef class %s unrecognized',class(OutRasterRef))
+end
+
+% input coordinates that correspond to all output coordinates
+if isempty(InProj) % input grid is lat-lon
+    Xq = lon;
+    Yq = lat;
+else
+    try
+        [Xq,Yq] = mfwdtran(InProj,lat,lon);
+    catch
+        [Xq,Yq] = projfwd(InProj,lat,lon);
+    end
+end
+
+geolocated = ~isempty(inLat); % otherwise geographic or projected
+
+% set fillvalues if not already specified
+origType = class(A);
+if isempty(fillvalue) % fill value depending on original type
+    switch origType
+        case {'single','double'}
+            fillvalue = NaN;
+        case {'uint8','uint16','uint32','uint64'}
+            fillvalue = intmax(origType);
+        case {'int8','int16','int32','int64'}
+            fillvalue = intmin(origType);
+        case 'logical'
+            fillvalue = false;
+        otherwise
+            error('class ''%s'' not recognized',origType)
+    end
+else % make sure fill value is within range
+    switch origType
+        case {'uint8','uint16','uint32','uint64','int8','int16','int32','int64'}
+            assert(fillvalue>=intmin(origType) && fillvalue<=intmax(origType),...
+                'fillvalue must be >=%d and <=%d for class ''%s''',...
+                intmin(origType),intmax(origType),origType)
+        case 'logical'
+            assert(islogical(fillvalue) || fillvalue==0 || fillvalue==1,...
+                'fillvalue must be true or false')
+            if ~islogical(fillvalue)
+                fillvalue = fillvalue==1;
+            end
+        case {'double','single'}
+            %do nothing as any value would work
+    end
+end
+
+% interpolate to output points specified in terms of input coordinates
+% set input values to double, setting their fillvalues to NaNs
+dblA = double(A);
+if ~isnan(fillvalue)
+    dblA(A==fillvalue) = NaN;
+end
+if geolocated
+    % B will be double
+    B = interpolateGeolocatedRaster(inLon,inLat,dblA,Xq,Yq,method);
+    t = isnan(B);
+    % to keep NaNs from propagating, fill in with values from nearest-neighbor
+    if any(t(:)) && ~strcmpi(method,'nearest')
+        newB = interpolateGeolocatedRaster(inLon,inLat,dblA,Xq,Yq,'nearest');
+        B(t) = newB(t);
+    end
+else
+    B = interpolateRaster(dblA,InRasterRef,Xq,Yq,method);
+    t = isnan(B);
+    % to keep NaNs from propagating, fill in with values from nearest-neighbor
+    if any(t(:)) && ~strcmpi(method,'nearest')
+        newB = interpolateRaster(dblA,InRasterRef,Xq,Yq,'nearest');
+        B(t) = newB(t);
+    end
+end
+
+% reset to original type
+t = isnan(B);
+if contains(origType,'single')
+    B = single(B);
+elseif contains(origType,'logical')
+    x = B>=0.5;
+    B = x;
+elseif ~contains(origType,'double')
+    % just signed or unsigned ints are the possibilities
+    B = cast(round(B),origType);
+end
+if ~isnan(fillvalue)
+    B(t) = fillvalue;
+    if any(t,'all') && nargout<3
+        warning('output unknowns set to %g',fillvalue)
+    end
+end
+
+% if original input was categorical, transform back from signed int
+if exist('categories','var')
+    B = invCategorical(B,categories,catIndex);
+end
+
+% set the optional output fillvalue and referencing matrix
+RRB = OutRasterRef;
+if nargout>2
+    varargout{1} = fillvalue;
+    if nargout>3
+        varargout{2} = RasterRef2Refmat(RRB);
+    end
+end
+end
+##### SOURCE END #####
+--></body></html>
