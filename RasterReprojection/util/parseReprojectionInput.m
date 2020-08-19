@@ -32,7 +32,7 @@ addParameter(p,validatestring('YLimit',{'yli','ylim','ylimit'}),...
 addParameter(p,validatestring('adjust',{'adj','adjust'}),...
     defaultAdjust,@islogical)
 addParameter(p,validatestring('cells',{'cel','cell','cells'}),...
-    defaultCells,@islogical)
+    defaultCells,@(x) islogical(x) || isnumeric(x))
 addParameter(p,validatestring('origin',{'ori','org','orig','origin'}),...
     defaultOrigin,@(x) ischar(x) &&...
     (strcmpi(x,'ul') || strcmpi(x,'ll') || strcmpi(x,'ur') || strcmpi(x,'lr')))
@@ -53,7 +53,6 @@ addParameter(p,validatestring('fillvalue',{'fil','fill','fillv','fillvalue'}),..
 addParameter(p,validatestring('rotate',{'rot','rotate','rotation'}),...
     defaultRotation,@(x) isnumeric(x) && isscalar(x))
 
-
 parse(p,A,InRR,InS,OutS,varargin{:})
 
 if isempty(p.Results.InS)
@@ -70,16 +69,23 @@ end
 % which planet
 planet = lower(p.Results.planet);
 
+% cells or postings
+assumeCells = logical(p.Results.cells);
+
 % interpolation method
 if islogical(A) || iscategorical(A)
     method = 'nearest';
 else
-if isempty(InRR)
-    expectedMethods = {'linear','nearest','natural'};
-else
-    expectedMethods = {'linear','nearest','cubic','spline','makima'};
-end
-method = validatestring(lower(p.Results.method),expectedMethods);
+    if isempty(InRR)
+        expectedMethods = {'linear','nearest','natural'};
+    else
+        expectedMethods = {'linear','nearest','cubic','spline','makima'};
+        if assumeCells && strcmpi(InRR.RasterInterpretation,'postings')
+            warnstr = sprintf('Input raster reference has RasterInterpretation set to ''postings''.\nIf this is correct set ''cells'' to false to prevent this message. Otherwise consider modifying the input raster reference using postings2cells.m');
+            warning(warnstr) %#ok<SPWRN>
+        end
+    end
+    method = validatestring(lower(p.Results.method),expectedMethods);
 end
 
 fillvalue = p.Results.fillvalue;
@@ -236,7 +242,7 @@ if isempty(p.Results.rasterref)
     
     % geographic or projected
     if isempty(OutS)
-        if p.Results.cells
+        if assumeCells
             OutRR = georefcells(YLimit,XLimit,[nRows nCols],...
                 'ColumnsStartFrom',startcol,'RowsStartFrom',startrow);
         else
@@ -244,7 +250,7 @@ if isempty(p.Results.rasterref)
                 'ColumnsStartFrom',startcol,'RowsStartFrom',startrow);
         end
     else
-        if p.Results.cells
+        if assumeCells
             OutRR = maprefcells(XLimit,YLimit,[nRows nCols],...
                 'ColumnsStartFrom',startcol,'RowsStartFrom',startrow);
         else
@@ -261,6 +267,10 @@ if isempty(p.Results.rasterref)
     
 else
     OutRR = p.Results.rasterref;
+    if assumeCells && strcmpi(OutRR.RasterInterpretation,'postings')
+        warnstr = sprintf('Output ''rasterref'' has RasterInterpretation set to ''postings''.\nIf this is correct set ''cells'' to false to prevent this message. Otherwise consider modifying the output raster reference using postings2cells.m');
+        warning(warnstr) %#ok<SPWRN>
+    end
 end
 
 end
