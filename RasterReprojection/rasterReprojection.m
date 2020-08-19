@@ -1,12 +1,13 @@
 function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin )
 % [ B, RRB [,fillvalue, RefMatrix]] = rasterReprojection(A,InR,InProj,OutProj [,Prop/Value pairs] )
-%Reprojects raster from a projected, geographic, or geolocated raster (2D or 3D)
-%to a different projection or geographic raster, or to the same projection with
-%a different cell size
-%(there is no option for output geolocated raster, but this option could be
-%implemented if it would be useful)
+%%
+% Reprojects raster from a projected, geographic, or geolocated raster (2D or 3D)
+% to a different projection or geographic raster, or to the same projection
+% with a different cell size
+% (there is no option for output geolocated raster, but this option could be
+% implemented if it would be useful)
 %
-%INPUT
+%% INPUT
 %   A - input raster (2D or 3D), any numeric type, or logical or categorical
 %       (categorical data are supported by indexing them to integers and
 %       setting the interpolation method to 'nearest', then recasting them
@@ -16,9 +17,12 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %   InR - raster reference (geographic or mapping) for A. InR must be empty
 %       if input data are geolocated, in which case lat-lon grids are
 %       specified below.
+%       (generally raster interpretation should be 'cells', not 'postings',
+%       so a warning is issued if InR specifies 'postings' unless 'cells'
+%       below is false)
 %   InProj - input projection structure, [] if geographic or geolocated
 %   OutProj - output projection structure, [] if geographic
-% OPTIONAL INPUT
+%% OPTIONAL INPUT
 %   name-value pairs, case-insensitive, abbreviations of 3 or more letters
 %       generally work, in any order specifying:
 %       'planet' - planet name as a character string, case insensitive,
@@ -48,7 +52,13 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %           signed integers, maximum for unsigned integers, or you can
 %           specify a value)
 %
-%       The following arguments are ignored if 'rasterref' option is used
+%       The following arguments are ignored if 'rasterref' option is used,
+%       except 'cells' should be set to false if the input 'rasterref' sets
+%       'postings' as the raster interpretation, otherwise a warning is
+%       triggered
+%       'cells' - true or false to specify whether inputs are cells or
+%           postings (default true, checks and warns if InR or 'rasterref'
+%           specifies 'postings' as the raster interpretation)
 %       'pixelsize' - either a 2-element vector specifying height and width
 %           of output cells, or a scalar if height=width (default is to
 %           approximately match the cell size of input raster)
@@ -59,25 +69,23 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %       'adjust' - true or false to adjust x- and y-limits to be a multiple
 %           of the pixelsize (default true unless 'rasterref' specified, in
 %           which case default is false)
-%       'cells' - true or false to specifiy whether inputs are cells or
-%           postings (default true, also ignored if InR is a raster
-%           reference)
 %       'rotate' - in degrees, +ccw, if the output projection is rotated so
 %           an affine transformation is needed
 %
-%OUTPUT
-%   B output reprojected raster, same class as input A
-%   RRB raster reference object for B
+%% OUTPUT
+%   B - output reprojected raster, same class as input A
+%   RRB - raster reference object for B
 %       (if you want a referencing matrix also, use the optional output)
-%Optional OUTPUT, in order
+% Optional OUTPUT, in order
 %   fillvalue - especially useful if input data are not floating point and
 %       you want to convert them to floating point
 %   RefMatrix - referencing matrix
 
-assert(ismatrix(A) || ndims(A)==3,...
-    'input array must have 2 or 3 dimensions')
+%%
 
 % parse inputs
+assert(ismatrix(A) || ndims(A)==3,...
+    'input array must have 2 or 3 dimensions')
 optargin=length(varargin);
 assert (mod(optargin,2)==0,'must be even number of optional arguments')
 [InRasterRef,OutRasterRef,planet,method,inLat,inLon,fillvalue] =...
@@ -90,15 +98,13 @@ end
 
 % coarsen input image if output is at significantly coarser
 % resolution, so that the output is averaged over multiple input pixels
-if ~isempty(InRasterRef) &&...
-        ~strcmpi(method,'nearest') &&...
-        contains(InRasterRef.RasterInterpretation,'cells','IgnoreCase',true)
+if ~isempty(InRasterRef) && ~strcmpi(method,'nearest')
     [A,InRasterRef] = coarsenInput(A,InRasterRef,OutRasterRef,planet,fillvalue);
 end
 
 % world coordinates in output image
-    [XIntrinsic,YIntrinsic] =...
-        meshgrid(1:OutRasterRef.RasterSize(2),1:OutRasterRef.RasterSize(1));
+[XIntrinsic,YIntrinsic] =...
+    meshgrid(1:OutRasterRef.RasterSize(2),1:OutRasterRef.RasterSize(1));
 if contains(class(OutRasterRef),'map.rasterref.Map','IgnoreCase',true)
     [XWorld, YWorld] = intrinsicToWorld(OutRasterRef,XIntrinsic,YIntrinsic);
     try % minvtran fails on some projections
@@ -126,7 +132,7 @@ end
 
 geolocated = ~isempty(inLat); % otherwise geographic or projected
 
-%set fillvalues if not already specified
+% set fillvalues if not already specified
 origType = class(A);
 if isempty(fillvalue) % fill value depending on original type
     switch origType
@@ -196,6 +202,9 @@ elseif ~contains(origType,'double')
 end
 if ~isnan(fillvalue)
     B(t) = fillvalue;
+    if any(t,'all') && nargout<3
+        warning('output unknowns set to %g',fillvalue)
+    end
 end
 
 % if original input was categorical, transform back from signed int
