@@ -1,5 +1,5 @@
-function [InRR,OutRR,planet,method,inLat,inLon,fillvalue] =...
-    parseReprojectionInput(A,InRR,InS,OutS,varargin)
+function [InRR,OutRR,InS,OutS,planet,method,inLat,inLon,fillvalue] =...
+    parseReprojectionInput(A,InRR,varargin)
 %parse input values to produce output raster reference object
 
 p = inputParser;
@@ -20,8 +20,10 @@ inLon = [];
 addRequired(p,'A',@(x) (isnumeric(x) || islogical(x) || iscategorical(x)) &&...
     (ismatrix(x) || ndims(x)==3))
 addRequired(p,'InRR',@(x) contains(class(x),'rasterref') || isempty(x))
-addRequired(p,'InS',@(x) isstruct(x) || isempty(x))
-addRequired(p,'OutS',@(x) isstruct(x) || isempty(x))
+addParameter(p,validatestring('InProj',{'inp','inpr','inproj'}),[],...
+    @(x) isstruct(x) || isempty(x) || contains(class(x),'projcrs'))
+addParameter(p,validatestring('OutProj',{'out','outp','outproj'}),[],...
+    @(x) isstruct(x) || isempty(x) || contains(class(x),'projcrs'))
 addParameter(p,validatestring('pixelsize',{'pix','pixel','pixelsize'}),...
     defaultPixelSize,...
     @(x) isnumeric(x) && (isscalar(x) || length(x)==2))
@@ -53,17 +55,45 @@ addParameter(p,validatestring('fillvalue',{'fil','fill','fillv','fillvalue'}),..
 addParameter(p,validatestring('rotate',{'rot','rotate','rotation'}),...
     defaultRotation,@(x) isnumeric(x) && isscalar(x))
 
-parse(p,A,InRR,InS,OutS,varargin{:})
+parse(p,A,InRR,varargin{:})
 
-if isempty(p.Results.InS)
-    InS = struct([]);
-else
-    InS = p.Results.InS;
+if ~isempty(p.Results.rasterref)
+    OutRR = p.Results.rasterref;
+    if any(contains(fieldnames(OutRR),'ProjectedCRS')) &&...
+            ~isempty(OutRR.ProjectedCRS)
+        assert(isempty(p.Results.outproj),...
+            'projection specified in output rasterref, so don''t also specify an output projection')
+    end
 end
-if isempty(p.Results.OutS)
-    OutS = struct([]);
+if ~isempty(InRR) && any(contains(fieldnames(InRR),'ProjectedCRS')) &&...
+        ~isempty(InRR.ProjectedCRS)
+    assert(isempty(p.Results.inproj),...
+        'projection specified in input rasterref, so don''t also specify an input projection')
+end
+
+if isempty(p.Results.inproj)
+    if ~isempty(InRR) && any(contains(fieldnames(InRR),'ProjectedCRS')) &&...
+            ~isempty(InRR.ProjectedCRS)
+        InS = InRR.ProjectedCRS;
+    else
+        InS = struct([]);
+    end
 else
-    OutS = p.Results.OutS;
+    InS = p.Results.inproj;
+    if contains(class(InS),'projcrs')
+        InRR.ProjectedCRS = InS;
+    end
+end
+if isempty(p.Results.outproj)
+    if ~isempty(p.Results.rasterref) &&...
+            any(contains(fieldnames(OutRR),'ProjectedCRS')) &&...
+            ~isempty(OutRR.ProjectedCRS)
+        OutS = OutRR.ProjectedCRS;
+    else
+        OutS = struct([]);
+    end
+else
+    OutS = p.Results.outproj;
 end
 
 % which planet
@@ -144,10 +174,10 @@ else
             [XIntrinsic,YIntrinsic] =...
                 meshgrid([1 InRR.RasterSize(2)],[1 InRR.RasterSize(1)]);
             [xWorld,yWorld] = intrinsicToWorld(InRR,XIntrinsic, YIntrinsic);
-            try % minvtran fails on some projections if projection structure incorrect
-                [latlim,lonlim] = minvtran(InS,xWorld,yWorld);
-            catch % in those cases, use projinv instead, which also fails on some, like UTM
+            try % projinv fails on some projections if projection structure incorrect
                 [latlim,lonlim] = projinv(InS,xWorld,yWorld);
+            catch % in those cases, use minvtran instead, which also fails on some
+                [latlim,lonlim] = minvtran(InS,xWorld,yWorld); %#ok<MINVT>
             end
         end
     end
@@ -175,9 +205,9 @@ if isempty(p.Results.rasterref)
             ylimit = [min(latlim(:)) max(latlim(:))];
         else
             try
-                [x,y] = mfwdtran(OutS,latlim,lonlim);
-            catch
                 [x,y] = projfwd(OutS,latlim,lonlim);
+            catch
+                [x,y] = mfwdtran(OutS,latlim,lonlim); %#ok<MFWDT>
             end
             xlimit = [min(x(:)) max(x(:))];
             ylimit = [min(y(:)) max(y(:))];
@@ -264,13 +294,14 @@ if isempty(p.Results.rasterref)
     if doAffine
         OutRR = transformToAffine(OutRR,p.Results.rotate);
     end
-    
 else
-    OutRR = p.Results.rasterref;
     if assumeCells && strcmpi(OutRR.RasterInterpretation,'postings')
         warnstr = sprintf('Output ''rasterref'' has RasterInterpretation set to ''postings''.\nIf this is correct set ''cells'' to false to prevent this message. Otherwise consider modifying the output raster reference using postings2cells.m');
         warning(warnstr) %#ok<SPWRN>
     end
+end
+if contains(class(OutS),'projcrs')
+    OutRR.ProjectedCRS = OutS;
 end
 
 end

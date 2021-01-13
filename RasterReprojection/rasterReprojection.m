@@ -1,5 +1,5 @@
-function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin )
-% [ B, RRB [,fillvalue, RefMatrix]] = rasterReprojection(A,InR,InProj,OutProj [,Prop/Value pairs] )
+function [ B, RRB, varargout] = rasterReprojection(A,InR,varargin )
+% [ B, RRB [,fillvalue]] = rasterReprojection(A,InR, [,Prop/Value pairs] )
 %%
 % Reprojects raster from a projected, geographic, or geolocated raster (2D or 3D)
 % to a different projection or geographic raster, or to the same projection
@@ -20,11 +20,13 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %       (generally raster interpretation should be 'cells', not 'postings',
 %       so a warning is issued if InR specifies 'postings' unless 'cells'
 %       below is false)
-%   InProj - input projection structure, [] if geographic or geolocated
-%   OutProj - output projection structure, [] if geographic
 %% OPTIONAL INPUT
 %   name-value pairs, case-insensitive, abbreviations of 3 or more letters
 %       generally work, in any order specifying:
+%       'InProj' - input projection structure or projcrs object, often
+%       not needed in MATLAB versions R2020b and beyond because InR
+%       contains a ProjectedCRS field
+%       'OutProj' - output projection structure or projcrs object,
 %       'planet' - planet name as a character string, case insensitive,
 %           defaults to 'earth'
 %       'hemisphere' - specify if input image is entire northern or southern
@@ -75,21 +77,21 @@ function [ B, RRB, varargout] = rasterReprojection(A,InR,InProj,OutProj,varargin
 %% OUTPUT
 %   B - output reprojected raster, same class as input A
 %   RRB - raster reference object for B
-%       (if you want a referencing matrix also, use the optional output)
-% Optional OUTPUT, in order
+% Optional OUTPUT
 %   fillvalue - especially useful if input data are not floating point and
 %       you want to convert them to floating point
-%   RefMatrix - referencing matrix
-
 %%
+
+nargoutchk(0,3)
+narginchk(2,20)
 
 % parse inputs
 assert(ismatrix(A) || ndims(A)==3,...
     'input array must have 2 or 3 dimensions')
 optargin=length(varargin);
 assert (mod(optargin,2)==0,'must be even number of optional arguments')
-[InRasterRef,OutRasterRef,planet,method,inLat,inLon,fillvalue] =...
-    parseReprojectionInput(A,InR,InProj,OutProj,varargin{:});
+[InRasterRef,OutRasterRef,InProj,OutProj,planet,method,inLat,inLon,fillvalue] =...
+    parseReprojectionInput(A,InR,varargin{:});
 
 % convert categorical to integer
 if iscategorical(A)
@@ -99,7 +101,8 @@ end
 % coarsen input image if output is at significantly coarser
 % resolution, so that the output is averaged over multiple input pixels
 if ~isempty(InRasterRef) && ~strcmpi(method,'nearest')
-    [A,InRasterRef] = coarsenInput(A,InRasterRef,OutRasterRef,planet,fillvalue);
+    [A,InRasterRef] = coarsenInput(A,postings2cells(InRasterRef),...
+        OutRasterRef,planet,fillvalue);
 end
 
 % world coordinates in output image
@@ -107,10 +110,10 @@ end
     meshgrid(1:OutRasterRef.RasterSize(2),1:OutRasterRef.RasterSize(1));
 if contains(class(OutRasterRef),'map.rasterref.Map','IgnoreCase',true)
     [XWorld, YWorld] = intrinsicToWorld(OutRasterRef,XIntrinsic,YIntrinsic);
-    try % minvtran fails on some projections
-        [lat,lon] = minvtran(OutProj,XWorld,YWorld);
-    catch % in those cases, use projinv instead, which also fails on some
+    try % projinv fails on some projections in some versions of MATLAB
         [lat,lon] = projinv(OutProj,XWorld,YWorld);
+    catch % in those cases, use minvtran instead, which will be deprecated
+        [lat,lon] = minvtran(OutProj,XWorld,YWorld); %#ok<MINVT>
     end
 elseif contains(class(OutRasterRef),'Geographic')
     [lat,lon] = intrinsicToGeographic(OutRasterRef,XIntrinsic,YIntrinsic);
@@ -124,9 +127,9 @@ if isempty(InProj) % input grid is lat-lon
     Yq = lat;
 else
     try
-        [Xq,Yq] = mfwdtran(InProj,lat,lon);
-    catch
         [Xq,Yq] = projfwd(InProj,lat,lon);
+    catch
+        [Xq,Yq] = mfwdtran(InProj,lat,lon); %#ok<MFWDT>
     end
 end
 
@@ -173,19 +176,25 @@ end
 if geolocated
     % B will be double
     B = interpolateGeolocatedRaster(inLon,inLat,dblA,Xq,Yq,method);
-    t = isnan(B);
-    % to keep NaNs from propagating, fill in with values from nearest-neighbor
-    if any(t(:)) && ~strcmpi(method,'nearest')
-        newB = interpolateGeolocatedRaster(inLon,inLat,dblA,Xq,Yq,'nearest');
-        B(t) = newB(t);
+    % to keep NaNs from propagating and to fix values where interpolation yielded
+    % outside range, fill in with values from nearest-neighbor
+    if ~strcmpi(method,'nearest')
+        t = isnan(B) | B<min(dblA(:)) | B>max(dblA(:));
+        if any(t,'all')
+            newB = interpolateGeolocatedRaster(inLon,inLat,dblA,Xq,Yq,'nearest');
+            B(t) = newB(t);
+        end
     end
 else
     B = interpolateRaster(dblA,InRasterRef,Xq,Yq,method);
-    t = isnan(B);
-    % to keep NaNs from propagating, fill in with values from nearest-neighbor
-    if any(t(:)) && ~strcmpi(method,'nearest')
-        newB = interpolateRaster(dblA,InRasterRef,Xq,Yq,'nearest');
-        B(t) = newB(t);
+    % to keep NaNs from propagating and to fix values where interpolation yielded
+    % outside range, fill in with values from nearest-neighbor
+    if ~strcmpi(method,'nearest')
+        t = isnan(B) | B<min(dblA(:)) | B>max(dblA(:));
+        if any(t,'all')
+            newB = interpolateRaster(dblA,InRasterRef,Xq,Yq,'nearest');
+            B(t) = newB(t);
+        end
     end
 end
 
@@ -216,8 +225,5 @@ end
 RRB = OutRasterRef;
 if nargout>2
     varargout{1} = fillvalue;
-    if nargout>3
-        varargout{2} = RasterRef2Refmat(RRB);
-    end
 end
 end

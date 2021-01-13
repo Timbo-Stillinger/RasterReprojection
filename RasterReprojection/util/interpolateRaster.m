@@ -20,9 +20,7 @@ else
 end
 
 %memory check
-if ispc
     RasterReprojectionMemoryCheck((numel(Xq)+numel(Yq))*8*size(A,3));
-end
 
 %should have enough memory, go ...
 if ismatrix(A)
